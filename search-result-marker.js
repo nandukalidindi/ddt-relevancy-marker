@@ -4,8 +4,10 @@ $(document).ready(function() {
     method: 'POST',
     action: 'xhttp',
     url: 'http://localhost:8084/getAvailableDomains',
-    data: 'type=init'
+    data: {type: 'init'}
   }, function(responseText) {
+    var selectedDomainId = null;
+    var selectedURL = null;
     var domainIdNameMap = [{name: 'None', value: 'none'}];
     var domainMap = (JSON.parse(responseText || "{}").crawlers || []).map(domain => { return { name: domain.name, id: domain.id }});
     domainIdNameMap.push(...domainMap);
@@ -38,7 +40,8 @@ $(document).ready(function() {
       });
 
       selectList.addEventListener("change", function(event) {
-        debugger;
+        selectedDomainId = event.target.value;
+        selectedURL = event.target.parentElement.parentElement.children[0].getElementsByTagName('a')[0].href;
       })
 
       return selectList;
@@ -56,11 +59,28 @@ $(document).ready(function() {
     }
 
     function relevantClick(event) {
-      debugger;
+      var session = {domainId: 'AVyGnHfK7oyaTA4p-E2Y'};
+
+      var data = 'urls=hello';
+
+      // data = data + JSON.stringify(session);
+
+      if(selectedDomainId) {
+        chrome.runtime.sendMessage({
+          method: 'POST',
+          action: 'xhttp',
+          url: 'http://localhost:8084/uploadUrls',
+          data: data
+        }, function(responseText) {
+          debugger;
+        });
+      }
     }
 
     function irrelevantClick(event) {
-      debugger;
+      if(selectedDomainId) {
+
+      }
     }
   });
 })
