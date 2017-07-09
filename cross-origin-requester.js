@@ -7,7 +7,7 @@ chrome.runtime.onMessage.addListener(function(request, sender, callback) {
       success: function(response) {
         callback(JSON.stringify(response));
       },
-      error: function(response) {
+      error: function(err) {
         console.log(err);
         callback(null);
       }

@@ -59,20 +59,15 @@ $(document).ready(function() {
     }
 
     function relevantClick(event) {
-      var session = {domainId: 'AVyGnHfK7oyaTA4p-E2Y'};
-
-      var data = 'urls=hello';
-
-      // data = data + JSON.stringify(session);
-
       if(selectedDomainId) {
         chrome.runtime.sendMessage({
           method: 'POST',
           action: 'xhttp',
           url: 'http://localhost:8084/uploadUrls',
-          data: data
+          data: {urls: selectedURL, tag: 'Relevant', session: JSON.stringify({domainId: 'AVyGnHfK7oyaTA4p-E2Y'})}
         }, function(responseText) {
-          debugger;
+          selectedDomainId = null;
+          selectedURL = null;
         });
       }
     }
