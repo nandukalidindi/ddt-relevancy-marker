@@ -1,83 +1,124 @@
 $(document).ready(function() {
+  chrome.storage.sync.get('ddt', function(response) {
+    if(response.ddt) {
+      chrome.runtime.sendMessage({
+        method: 'POST',
+        action: 'xhttp',
+        url: response.ddt + "/getAvailableDomains",
+        data: {type: 'init'}
+      }, function(responseText) {
+        var selectedDomainId = null;
+        var selectedURL = null;
+        var domainIdNameMap = [{name: 'None', id: 'none'}];
+        var domainMap = (JSON.parse(responseText || "{}").crawlers || []).map(domain => { return { name: domain.name, id: domain.id }});
+        domainIdNameMap.push(...domainMap);
+        var searchResults = document.getElementsByClassName("rc");
 
-  chrome.runtime.sendMessage({
-    method: 'POST',
-    action: 'xhttp',
-    url: 'http://localhost:8084/getAvailableDomains',
-    data: {type: 'init'}
-  }, function(responseText) {
-    var selectedDomainId = null;
-    var selectedURL = null;
-    var domainIdNameMap = [{name: 'None', value: 'none'}];
-    var domainMap = (JSON.parse(responseText || "{}").crawlers || []).map(domain => { return { name: domain.name, id: domain.id }});
-    domainIdNameMap.push(...domainMap);
-    var searchResults = document.getElementsByClassName("rc");
+        for(var i=0; i<searchResults.length; i++) {
+          var result = searchResults[i];
 
-    for(var i=0; i<searchResults.length; i++) {
-      var result = searchResults[i];
+          var parentDiv = document.createElement('div');
 
-      var parentDiv = document.createElement('div');
+          parentDiv.style.position = 'absolute';
+          parentDiv.style.top = '0px';
+          parentDiv.style.right = '-75px';
+          parentDiv.style['z-index'] = 9999;
+          parentDiv.style.cursor = 'pointer';
 
-      parentDiv.style.position = 'absolute';
-      parentDiv.style.top = '0px';
-      parentDiv.style.right = '-75px';
+          var id = result.children[0].getElementsByTagName('a')[0].href
 
-      parentDiv.appendChild(createSelectList(domainIdNameMap, {}, null));
-      parentDiv.appendChild(createButtonElement('RELEVANT', {right: '-75px'}, relevantClick));
-      parentDiv.appendChild(createButtonElement('IRRELEVANT', {right: '-150px'}, irrelevantClick));
+          parentDiv.appendChild(createSelectList(domainIdNameMap, {}, id));
 
-      result.appendChild(parentDiv);
-    }
+          var buttonDiv = document.createElement('div');
 
-    function createSelectList(options, style, onChangeCallback) {
-      var selectList = document.createElement("select");
+          buttonDiv.style['pointer-events'] = 'none';
+          buttonDiv.style.opacity = 0.5;
 
-      options.forEach(nameId => {
-        var option = document.createElement("option");
-        option.value = nameId.id;
-        option.text = nameId.name;
-        selectList.appendChild(option);
+          buttonDiv.appendChild(createButtonElement('RELEVANT', {right: '-75px'}, relevantClick));
+          buttonDiv.appendChild(createButtonElement('IRRELEVANT', {right: '-150px'}, irrelevantClick));
+          parentDiv.appendChild(buttonDiv);
+
+          result.appendChild(parentDiv);
+        }
+
+        function createSelectList(options, style, id) {
+          var selectList = document.createElement("select");
+          selectList.id = id;
+
+          options.forEach(nameId => {
+            var option = document.createElement("option");
+            option.value = nameId.id;
+            option.text = nameId.name;
+            selectList.appendChild(option);
+          });
+
+          selectList.addEventListener("change", onDomainSelectionChange)
+
+          return selectList;
+        }
+
+        function onDomainSelectionChange(event) {
+          if(event.target.value !== 'none') {
+            event.target.parentElement.children[1].style['pointer-events'] = 'auto';
+            event.target.parentElement.children[1].style.cursor = 'pointer';
+            event.target.parentElement.children[1].style.opacity = 1.0;
+
+            selectedDomainId = event.target.value;
+            selectedURL = event.target.parentElement.parentElement.children[0].getElementsByTagName('a')[0].href;
+          } else {
+            event.target.parentElement.children[1].style['pointer-events'] = 'none';
+            event.target.parentElement.children[1].style.opacity = 0.5;
+          }
+        }
+
+        function createButtonElement(value, style, onClickCallback) {
+          var element = document.createElement('input');
+          element.setAttribute('type', 'button');
+          element.setAttribute('value', value);
+          element.addEventListener('click', onClickCallback);
+          return element;
+        }
+
+        function relevantClick(event) {
+          if(selectedDomainId) {
+            chrome.runtime.sendMessage({
+              method: 'POST',
+              action: 'xhttp',
+              url: response.ddt + "/uploadUrls",
+              data: {urls: selectedURL, tag: 'Relevant', session: JSON.stringify({domainId: selectedDomainId})}
+            }, function(responseText) {
+              var selectListElement = document.getElementById(selectedURL);
+              if(selectListElement) {
+                selectListElement.value = 'none';
+                onDomainSelectionChange({target: selectListElement});
+              }
+              selectedDomainId = null;
+              selectedURL = null;
+            });
+          }
+        }
+
+        function irrelevantClick(event) {
+          if(selectedDomainId) {
+            chrome.runtime.sendMessage({
+              method: 'POST',
+              action: 'xhttp',
+              url: response.ddt + "/uploadUrls",
+              data: {urls: selectedURL, tag: 'Relevant', session: JSON.stringify({domainId: selectedDomainId})}
+            }, function(responseText) {
+              var selectListElement = document.getElementById(selectedURL);
+              if(selectListElement) {
+                selectListElement.value = 'none';
+                onDomainSelectionChange({target: selectListElement});
+              }
+              selectedDomainId = null;
+              selectedURL = null;
+            });
+          }
+        }
       });
-
-      selectList.addEventListener("change", function(event) {
-        selectedDomainId = event.target.value;
-        selectedURL = event.target.parentElement.parentElement.children[0].getElementsByTagName('a')[0].href;
-      })
-
-      return selectList;
     }
-
-    function createButtonElement(value, style, onClickCallback) {
-      var element = document.createElement('input');
-      element.setAttribute('type', 'button');
-      element.setAttribute('value', value);
-      // element.style.position = style.position || "absolute";
-      // element.style.top = style.top || "0px";
-      // element.style.right = style.right;
-      element.addEventListener('click', onClickCallback);
-      return element;
-    }
-
-    function relevantClick(event) {
-      if(selectedDomainId) {
-        chrome.runtime.sendMessage({
-          method: 'POST',
-          action: 'xhttp',
-          url: 'http://localhost:8084/uploadUrls',
-          data: {urls: selectedURL, tag: 'Relevant', session: JSON.stringify({domainId: 'AVyGnHfK7oyaTA4p-E2Y'})}
-        }, function(responseText) {
-          selectedDomainId = null;
-          selectedURL = null;
-        });
-      }
-    }
-
-    function irrelevantClick(event) {
-      if(selectedDomainId) {
-
-      }
-    }
-  });
+  })
 })
 
 // var url = window.location.href;
